@@ -63,34 +63,47 @@ You receive the project scaffold, README, OpenAPI, ADR and CI/CD pipeline
 ## Architecture
 
 ```
-devforge-web (Angular)
+serrastack-web (Angular)
         |
-devforge-bff (Java — single entry point)
+serrastack-bff (Java — single entry point)
         |
-┌───────────────────────────────────────────┐
-│               Microservices               │
-├──────────────┬──────────────┬─────────────┤
-│ ai-           │ scaffold-ms  │ iac-ms      │
-│ orchestrator  │              │             │
-│               │ Java         │ Terraform   │
-│ Interprets    │ Angular      │ AWS         │
-│ intent        │ React        │ Azure       │
-│ Chooses       │ Go           │ GCP         │
-│ template      │ Python       │ Cost est.   │
-├──────────────┴──────────────┴─────────────┤
-│ catalog-ms              destroy-ms        │
-│                                           │
-│ Service catalog         Safe destroy      │
-│ Maturity score          with approval     │
-│ Owners & deps           Cost report       │
-└───────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────┐
+│                     Microservices                    │
+├─────────────────────┬────────────────┬───────────────┤
+│ serrastack-          │ serrastack-    │ serrastack-   │
+│ ai-orchestrator      │ scaffold       │ iac           │
+│                      │                │               │
+│ Interprets intent    │ Java           │ Terraform     │
+│ Chooses template     │ Angular        │ AWS           │
+│ Builds plan          │ React          │ Azure         │
+│                      │ Go             │ GCP           │
+│                      │ Python         │ Cost estimate │
+├─────────────────────┴────────────────┴───────────────┤
+│ serrastack-catalog              serrastack-destroy    │
+│                                                       │
+│ Service catalog                 Safe destroy          │
+│ Maturity score                  with approval         │
+│ Owners & dependencies           Cost report           │
+└──────────────────────────────────────────────────────┘
         |
-┌───────────────────────────────────────────┐
-│           Storage & Infra                 │
-│ PostgreSQL · DynamoDB · S3 · LLM (Bedrock)│
-│ Terraform State (S3 + DynamoDB Lock)      │
-└───────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────┐
+│                  Storage & Infra                     │
+│  PostgreSQL · DynamoDB · S3 · LLM (Amazon Bedrock)   │
+│  Terraform State (S3 + DynamoDB Lock)                │
+└──────────────────────────────────────────────────────┘
 ```
+
+### Services
+
+| Service | Responsibility |
+|---|---|
+| `serrastack-web` | Angular frontend — developer portal |
+| `serrastack-bff` | Java BFF — single entry point for the frontend |
+| `serrastack-ai-orchestrator` | Interprets intent, chooses template, builds infrastructure plan |
+| `serrastack-scaffold` | Generates project scaffold (Java, Angular, React, Go, Python) |
+| `serrastack-iac` | Generates Terraform, estimates cost, executes with approval |
+| `serrastack-catalog` | Service catalog with owners, dependencies and maturity score |
+| `serrastack-destroy` | Destroys cloud resources safely with mandatory approval |
 
 ---
 
@@ -104,15 +117,15 @@ Every service ships with:
 - SLOs defined and monitored in Datadog
 
 **Dashboards:**
-- Platform Overview — requests, errors, LLM latency p99
-- FinOps — estimated vs real cost, LLM token usage, idle resources
-- Catalog Health — maturity score, services without tests, README or pipeline
+- **Platform Overview** — requests, errors, LLM latency p99, scaffolds by language
+- **FinOps** — estimated vs real cost, LLM token usage, idle resources, savings from destroys
+- **Catalog Health** — maturity score, services without tests, README or pipeline
 
 ---
 
 ## FinOps
 
-Before provisioning any resource, SerraStack shows:
+Before provisioning any resource, SerraStack shows the estimated monthly cost:
 
 ```
 Infrastructure plan — estimated monthly cost:
@@ -134,14 +147,14 @@ All provisioned resources are tagged for cost tracking per service and squad.
 
 ## Service Catalog
 
-Every service created by SerraStack is registered in the catalog with:
+Every service created by SerraStack is registered in `serrastack-catalog` with:
 
 - Owner and squad
 - Provisioned cloud resources with ARNs
 - REST endpoints and OpenAPI link
 - Queues and topics produced and consumed
 - Dependencies on other services
-- **Maturity score** — automated evaluation (README, Dockerfile, tests, pipeline, logs, OpenAPI, ADR, SLOs)
+- **Maturity score** — automated evaluation across 10 criteria: README, Dockerfile, tests, pipeline, structured logs, OpenAPI, ADR, health check, security scan and SLOs
 
 ---
 
@@ -192,6 +205,23 @@ Explore → Plan → Spec → Code → Commit
 
 ---
 
+## Monorepo structure
+
+```
+serrastack/
+├── serrastack-web/               # Angular frontend
+├── serrastack-bff/               # Java BFF
+├── serrastack-ai-orchestrator/   # AI intent interpreter
+├── serrastack-scaffold/          # Project scaffold generator
+├── serrastack-iac/               # Terraform generator and executor
+├── serrastack-catalog/           # Service catalog
+├── serrastack-destroy/           # Safe resource destruction
+├── CLAUDE.md                     # Project contract for Claude Code
+└── docker-compose.yml            # Local infrastructure
+```
+
+---
+
 ## Local setup
 
 ```bash
@@ -203,10 +233,10 @@ cd serrastack
 docker-compose up -d
 
 # Run a microservice
-./mvnw spring-boot:run -pl scaffold-ms
+./mvnw spring-boot:run -pl serrastack-scaffold
 
 # Run tests
-./mvnw test -pl scaffold-ms
+./mvnw test -pl serrastack-scaffold
 ```
 
 **Required environment variables:**
@@ -239,8 +269,6 @@ DD_ENV=local
 ## About
 
 Built by a backend developer from Petrópolis, Brazil — with a background in banking, real estate and a passion for platform engineering, developer experience and AI-first systems.
-
-Inspired by internal developer platforms like Backstage and Fury (Mercado Livre).
 
 ---
 
